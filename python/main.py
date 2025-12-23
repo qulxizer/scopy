@@ -1,3 +1,4 @@
+import os
 import sys
 import signal
 import time
@@ -27,10 +28,12 @@ LOG_FILE = "log.npy"  # LOG file name
 
 
 # -------------- LOGGING --------------
+if os.path.exists(LOG_FILE):
+    os.remove(LOG_FILE)
 log_buffer = np.empty((0, 2), dtype=np.float64)
 
 # ---------- shared state ----------
-latest_value = 0.0
+filtered_adc = None
 lock = Lock()
 running = True
 
@@ -45,19 +48,31 @@ def exp_filter(new, prev):
 
 
 # ---------- serial reader thread ----------
+
+
 def serial_reader(ser):
-    global latest_value, running, log_buffer
+    global latest_value, running, log_buffer, filtered_adc
+
     while running:
         while ser.in_waiting:
             line = ser.readline()
             try:
                 val = float(line.decode(errors="ignore").strip())
+
+                if not 0 <= val <= 4095:
+                    continue
+
+                if filtered_adc is None:
+                    filtered_adc = val
+                else:
+                    filtered_adc = exp_filter(val, filtered_adc)
+
+                voltage = adc_to_voltage(filtered_adc)
+
                 with lock:
-                    latest_value = val  # always keep newest
-                    new_sample = np.array(
-                        [[time.time(), adc_to_voltage(val)]], dtype=np.float64
-                    )
-                    log_buffer = np.vstack((log_buffer, new_sample))
+                    latest_value = filtered_adc
+                    log_buffer = np.vstack((log_buffer, [[time.time(), voltage]]))
+
             except ValueError:
                 continue
             except Exception:
@@ -94,14 +109,13 @@ def main():
     def update_plot():
         global log_buffer
         nonlocal filtered
-        to_dump = []
         with lock:
-            to_dump = list(log_buffer)
-            val = latest_value
-        if to_dump:
-            with NpyAppendArray(LOG_FILE) as npaa:
-                npaa.append(log_buffer)
-                log_buffer = np.empty((0, 2), dtype=np.float64)
+            if log_buffer.size:
+                with NpyAppendArray(LOG_FILE) as npaa:
+                    print(log_buffer[:, 1].max())
+                    npaa.append(log_buffer)
+                    log_buffer = np.empty((0, 2), dtype=np.float64)
+            val = filtered_adc
         voltage = adc_to_voltage(val)
         filtered = exp_filter(voltage, filtered)
         t = time.perf_counter() - t0
