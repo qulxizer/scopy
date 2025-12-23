@@ -44,7 +44,7 @@ idf.py -p /dev/ttyUSBx flash monitor
 cd ../python
 python main.py
 ```
-### View previously dumped CSV
+### View previously dumped NPY
 ```bash
 python scripts/view.py
 ```
