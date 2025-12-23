@@ -12,6 +12,5 @@ void app_main(void) {
   while (1) {
     int raw_value = adc1_get_raw(ADC_CHANNEL);
     printf("%d\n", raw_value);
-    vTaskDelay(pdMS_TO_TICKS(10)); // Delay 1 second
   }
 }

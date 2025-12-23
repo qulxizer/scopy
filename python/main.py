@@ -1,8 +1,8 @@
 import sys
-import csv
 import signal
 import time
-from dataclasses import dataclass
+import numpy as np
+from npy_append_array import NpyAppendArray
 from traceback import print_exc
 import serial
 from threading import Thread, Lock
@@ -21,24 +21,13 @@ MAX_POINTS = 500
 ALPHA = 0.2  # exponential filter
 X_WINDOW = 10.0  # seconds
 GUI_UPDATE_MS = 16  # ~60 FPS
+
+LOG_FILE = "log.npy"  # LOG file name
 # =========================================
 
 
 # -------------- LOGGING --------------
-@dataclass
-class LogPoint:
-    Voltage: float
-    Time: float
-
-    def __iter__(self):
-        yield self.Time
-        yield self.Voltage
-
-
-log_buffer = deque()
-f_csv = open("log.csv", "w", newline="")
-writer = csv.writer(f_csv)
-writer.writerow(["Time", "Voltage"])
+log_buffer = np.empty((0, 2), dtype=np.float64)
 
 # ---------- shared state ----------
 latest_value = 0.0
@@ -57,7 +46,7 @@ def exp_filter(new, prev):
 
 # ---------- serial reader thread ----------
 def serial_reader(ser):
-    global latest_value, running
+    global latest_value, running, log_buffer
     while running:
         while ser.in_waiting:
             line = ser.readline()
@@ -65,14 +54,19 @@ def serial_reader(ser):
                 val = float(line.decode(errors="ignore").strip())
                 with lock:
                     latest_value = val  # always keep newest
-                    log_buffer.append(LogPoint(adc_to_voltage(val), time.time()))
+                    new_sample = np.array(
+                        [[time.time(), adc_to_voltage(val)]], dtype=np.float64
+                    )
+                    log_buffer = np.vstack((log_buffer, new_sample))
+            except ValueError:
+                continue
             except Exception:
                 print_exc()
 
 
 # ---------- main ----------
 def main():
-    global running
+    global running, log_buffer
 
     ser = serial.Serial(PORT, BAUD, timeout=0.01)
 
@@ -98,14 +92,16 @@ def main():
     t0 = time.perf_counter()
 
     def update_plot():
+        global log_buffer
         nonlocal filtered
         to_dump = []
         with lock:
             to_dump = list(log_buffer)
             val = latest_value
         if to_dump:
-            writer.writerows(to_dump)
-            f_csv.flush()
+            with NpyAppendArray(LOG_FILE) as npaa:
+                npaa.append(log_buffer)
+                log_buffer = np.empty((0, 2), dtype=np.float64)
         voltage = adc_to_voltage(val)
         filtered = exp_filter(voltage, filtered)
         t = time.perf_counter() - t0
@@ -126,7 +122,6 @@ def main():
         if ser.is_open:
             ser.close()
 
-        f_csv.close()
         app.quit()
 
     signal.signal(signal.SIGINT, lambda *_: cleanup())

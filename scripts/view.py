@@ -1,13 +1,17 @@
-import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
-FILE = "log.csv"
-DOWN_SAMPLE_RATE = 10
+FILE = "log.npy"
+DOWN_SAMPLE_RATE = 1
 
-# 1. Read CSV
-df = pd.read_csv(FILE)
 
-# 2. SORT BY TIME (The fix)
+# 1. Read Numpy Array
+data = np.load(FILE)  # shape (N, 2)
+print(type(data))
+df = pd.DataFrame(data, columns=["Time", "Voltage"])
+
+# 2. SORT BY TIME
 df = df.sort_values("Time").reset_index(drop=True)
 
 # 3. Downsample
