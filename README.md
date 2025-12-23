@@ -19,7 +19,6 @@ Scopy is a lightweight DIY oscilloscope built on the ESP32.
 - Serial connection to the ESP device
 
 ## Installation Steps
-___
 ### Cloning Repo & Setting the environment up
 ```bash
 git clone https://github.com/qulxizer/scopy.git
