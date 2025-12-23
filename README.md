@@ -1,5 +1,6 @@
 # scopy
 Scopy is a lightweight DIY oscilloscope built on the ESP32.
+![Demo](./assets/demo.png)
 
 ## Overview
 - **ESP code (`scopy_main.c`)**: Reads ADC and prints values to serial.

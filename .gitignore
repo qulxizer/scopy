@@ -2,5 +2,4 @@ build/
 .cache/
 venv/
 *.csv
-*.png
 *.npy
